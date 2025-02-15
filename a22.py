@@ -23,6 +23,17 @@ import plotly.graph_objects as go
 import sys
 import os
 
+ROT="\033[31m"
+NORM="\033[0m"
+"""
+\033[32m  Grün  
+\033[33m  Gelb  
+\033[34m  Blau  
+\033[35m  Magenta  
+\033[36m  Cyan  
+\033[37m  Weiß  
+"""
+
 # Funktion zur Umwandlung des Julianischen Tages in ein Gregorianisches Datum
 def j2g(jd):
     # Umwandlung des Julianischen Tages in Jahr, Monat, Tag (Gregorianisches Datum)
@@ -339,11 +350,11 @@ def main():
 
     max_Sum1, opt_Mono = bestimmeEinenOptimalenBeantragungszeitraum()
     max_Sum2, opt_Tupel = bestimmeZweiOptimaleBeantragungszeiträume()
-    print(f"{tb(opt_Tupel[0])} + {tb(opt_Tupel[1])} => {b(max_Sum2)} Tupel{opt_Tupel}")
+    print(f"{tb(opt_Tupel[0])} + {tb(opt_Tupel[1])} => {ROT}{b(max_Sum2)}{NORM} Tupel{opt_Tupel}")
 
     if not args.skip_3y:
         max_Sum3, opt_Triplet = bestimmeDreiOptimaleBeantragungszeiträume()
-        print(f"{tb(opt_Triplet[0])} + {tb(opt_Triplet[1])} + {tb(opt_Triplet[2])} => {b(max_Sum3)} Triplet[{opt_Triplet[0]}, {opt_Triplet[1]}, {opt_Triplet[2]}]")
+        print(f"{tb(opt_Triplet[0])} + {tb(opt_Triplet[1])} + {tb(opt_Triplet[2])} => {ROT}{b(max_Sum3)}{NORM} Triplet[{opt_Triplet[0]}, {opt_Triplet[1]}, {opt_Triplet[2]}]")
     else:
         iprint(f"Hinweis: Die Optimierung von drei Abrechnungszeiträumen wurde wunschgemäß übersprungen.")
         
