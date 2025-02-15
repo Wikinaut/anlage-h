@@ -131,18 +131,13 @@ def load_gehalt_values(file_name='gehalt.csv'):
     df['formatted_gehalt']=df['gehalt'].apply(b)
     return df
 
-# Viertes Jahr ist Schaltjahr
-LEAPDAY=1153 # 29.02.2024 jd 1153
-
-MAXDAYS=364+365+365+366 # 02.01.2021 (jd 0) - 31.12.2024 (jd 1459) Beispiel
-YEAR=365
-LEAPYEAR=366
-
 # adjust for 365/366 search windows
 # wenn der aktuelle Beantragungszeitraum einen Schalttag umfasst,
 # dann darf das nachfolgende Suchintervall erst nach 366 Tagen beginnen
 
 def leapspan(jd):
+    if not LEAPDAY:
+        return YEAR
     if jd in range(LEAPDAY-YEAR,LEAPDAY+1):
         return LEAPYEAR
     else:
@@ -257,7 +252,7 @@ def main():
     print("'Beantragungszeitraum' meint den freiwählbaren Ein-Jahres-Zeitraum (365 Tage), falls ein Schalttag beeinhaltet ist: 366 Tage.")
 
     iprint(f"Die eingelesenen Cigna-Daten umfassen den Zeitraum {T(startJD)} → {T(endJD)}, das sind {endJD-startJD+1} Tage.")
-    print(f"Hinweis: Index[0] = Offset Julian date {startJD} ({t(0)})")
+    iprint(f"Hinweis: Index[0] = Offset Julian date {startJD} ({t(0)})")
 
     # Salary values
     df_gehalt_sparse = load_gehalt_values(args.Durchschnittsgehälter)
@@ -317,17 +312,33 @@ def main():
     RAW = df['Betrag'].values
     Z = merged_df['cut'].values
     
+    global LEAPDAY
+    LEAPDAY = False
+
     iprint("Zum Kalenderjahr synchrone Beantragungszeiträume ab dem ältesten 02.01. (ältester möglicher Beantragungszeitraum):")
     # Durchlaufe die Julian Dates und prüfe auf den Schalttag (29.02.) und Jahresbeginne (02.01.)
     for jd in jd_range:
     
         year, month, day = gregorian.from_jd(jd)
-        # Prüfen, ob es der 29. Februar ist
-        # if month == 2 and day == 29:
-        #    print(f"   Hinweis: Schalttag gefunden: {T(jd)} Index[{jd-offset}]")
+        if month == 2 and day == 29:
+            iprint(f"Hinweis: Schalttag für {year} (Schaltjahr) gefunden: {T(jd)} Index[{jd-offset}]")
+            LEAPDAY = jd-offset
             
         if month == 1 and day == 2:
             print(f"{T(jd)} {B(RAW[jd-offset])} {b(Z[jd-offset])} [{jd-offset}]")
+
+    # Ein Jahr ist Schaltjahr, meistens
+    # LEAPDAY=1153 # 29.02.2024 jd 1153
+    # 02.01.2021 (jd 0) - 31.12.2024 (jd 1459) Beispiel
+
+    global YEAR,MAXDAYS,LEAPYEAR
+    YEAR=365
+    if not LEAPDAY:
+        LEAPYEAR=365
+        MAXDAYS=YEAR-1+YEAR+YEAR+YEAR
+    else:
+        LEAPYEAR=366
+        MAXDAYS=YEAR-1+YEAR+YEAR+LEAPYEAR
 
     max_Sum1, opt_Mono = bestimmeEinenOptimalenBeantragungszeitraum()
     max_Sum2, opt_Tupel = bestimmeZweiOptimaleBeantragungszeiträume()
