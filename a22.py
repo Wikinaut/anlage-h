@@ -3,6 +3,9 @@
 # initial 20250122 TG
 #         20250214
 #
+# Version für Optimierungslauf im Jahr 2025
+# d.h. 02.01.2021 bis 31.12.2024
+#
 # erstellt mit teilweiser Verwendung von ChatGPT
 
 # pip install pandas plotly convertdate
