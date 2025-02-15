@@ -3,7 +3,7 @@
 # initial 20250122 TG
 #         20250214
 #
-# erstellt unter Verwendung von ChatGPT
+# erstellt mit teilweiser Verwendung von ChatGPT
 
 # pip install pandas plotly convertdate
 # eventuell setuptool downgraden:
@@ -14,8 +14,6 @@
 
 import pandas as pd
 import csv
-import pickle
-import gzip
 import time
 from datetime import datetime
 from convertdate import julian,gregorian
@@ -74,7 +72,6 @@ class Counter:
 
 # Kommandozeilenparameter parsen
 def parse_arguments():
-   
     parser = argparse.ArgumentParser(description=
         "CIGNA-Anlage-H-Optimizer\n \nSimulationsdaten und eigene Gehaltsdaten als CSV-Dateien einlesen, optimieren und graphisch darstellen.",
         formatter_class=lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=45))
@@ -122,7 +119,6 @@ def date_to_julian(date_str):
 
 # Einlesen der Gehalt-Werte aus der Datei gehalt.csv und optionale " €" entfernen
 def load_gehalt_values(file_name='gehalt.csv'):
-
     # CSV-Datei einlesen
     df = pd.read_csv(file_name, header=None, names=['Datum', 'gehalt'])
 
@@ -134,35 +130,6 @@ def load_gehalt_values(file_name='gehalt.csv'):
 
 # Viertes Jahr ist Schaltjahr
 LEAPDAY=1153 # 29.02.2024 jd 1153
-MAXDAYS=364+365+365+366 # 02.01.2021 (jd 0) - 31.12.2024 (jd 1459) Beispiel
-YEAR=365
-LEAPYEAR=366
-
-# adjust for 365/366 search windows
-# wenn der aktuelle Beantragungszeitraum einen Schalttag umfasst,
-# dann darf das nachfolgende Suchintervall erst nach 366 Tagen beginnen
-
-def leapspan(jd):
-    if jd in range(LEAPDAY-YEAR,LEAPDAY+1):
-        return LEAPYEAR
-    else:
-        return YEAR
-        
-# Einlesen der Tripel aus der komprimierten T3
-def load_T3(file_name='T3.bin.gz'):
-    with gzip.open(file_name, 'rb') as file:
-        T3 = pickle.load(file)
-    return T3
-
-# Einlesen der Tupel aus der komprimierten Datei
-def load_T2(file_name='T2.bin.gz'):
-    with gzip.open(file_name, 'rb') as file:
-        T2 = pickle.load(file)
-    return T2
-
-
-# Viertes Jahr ist Schaltjahr
-LEAPDAY=1153 # 29.02.2024 jd 1153
 
 MAXDAYS=364+365+365+366 # 02.01.2021 (jd 0) - 31.12.2024 (jd 1459) Beispiel
 YEAR=365
@@ -178,55 +145,17 @@ def leapspan(jd):
     else:
         return YEAR
 
-# Erstellen der Liste von validen Tupeln T2 und Tripeln T3
-def generateTupel():
-    T2 = []
+# Erstellen der Listen valider Tupel T2 und Triplets T3
+def generatorT2():
     for i in range(MAXDAYS):
         for j in range(i + leapspan(i), MAXDAYS):
-            T2.append([i, j])
+            yield (i, j)
 
-    """    
-    # Speichern der Tupel in einer CSV-Datei
-    with open('T2.csv', mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(T2)
-    print("T2 wurde erfolgreich in T2.csv gespeichert.")
-    """
-
-    # Speichern der Tupel in einer komprimierten Binärdatei
-    with gzip.open('T2.bin.gz', 'wb') as file:
-        pickle.dump(T2, file)
-    print("T2 wurde erfolgreich in T2.bin.gz gespeichert.")
-
-   
-def generateTripel():
-
-    # Version 1: sets
-    unique_triplets = set()
-    
+def generatorT3():
     for i in range(MAXDAYS):
         for j in range( i + leapspan(i), MAXDAYS):
             for k in range(j + leapspan(j), MAXDAYS):
-                triplet = (i, j, k)  # Tupel erstellen
-                unique_triplets.add(triplet)  # Tupel zur Menge hinzufügen
-
-    # Wenn du eine Liste benötigst:
-    T3 = list(unique_triplets)
-
-    """
-    # CSV
-    # Speichern der Tupel in einer CSV-Datei
-    with open('T3.csv', mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(T3)
-    print("T3 wurde erfolgreich in T3.csv gespeichert.")
-    """
-    
-    # Speichern der Tupel in einer komprimierten Binärdatei
-    with gzip.open('T3.bin.gz', 'wb') as file:
-        pickle.dump(T3, file)
-    print("T3 wurde erfolgreich in T3.bin.gz gespeichert.")
-
+                yield (i, j, k)  # Triplet erstellen
 
 def bestimmeEinenOptimalenBeantragungszeitraum():
     iprint("Globales Maximum eines (einzigen) Beantragungszeitraums im gesamten Zeitfenster:")
@@ -235,57 +164,55 @@ def bestimmeEinenOptimalenBeantragungszeitraum():
     return Z[jd], jd
 
 def bestimmeZweiOptimaleBeantragungszeiträume():
-    # Tupel einlesen
-    T2 = load_T2('T2.bin.gz')
-
     iprint(f"Zwei Beantragungszeiträume, deren Summe maximal ist:")
-    print(f"{len(T2):,}".replace(',', '.') + " zu testende Kombinationen von zwei Abrechnungszeiträumen.")
 
     # Initialisierung der maximalen Summe und des Index-Tupels
     max_sum = float('-inf')
     max_tupel = None
     tupel_sums = []
-
+    countT2 = 0
+    
     # Berechnung der Summen und Bestimmung der maximalen Summe
-    for tupel in T2:
+    for tupel in generatorT2():
         i, j = tupel
-        sum_value = Z[i] + Z[j]
+        countT2 += 1
+        sumT2 = Z[i] + Z[j]
 
-        if sum_value > max_sum or (sum_value == max_sum and tupel < max_tupel):
-            max_sum = sum_value
+        if sumT2 > max_sum or (sumT2 == max_sum and tupel < max_tupel):
+            max_sum = sumT2
             max_tupel = tupel
-            tupel_sums.append((sum_value, tupel))
+            tupel_sums.append((sumT2, tupel))
 
     # Sortieren der Tupel: Zuerst nach Summe (absteigend), dann nach Indizes (aufsteigend)
     tupel_sums.sort(key=lambda x: (-x[0], x[1]))  # -x[0] für absteigende Sortierung der Summe
+    print(f"{countT2:,}".replace(',', '.') + " zu testende Kombinationen von zwei Abrechnungszeiträumen.")
     return tupel_sums[0]
 
 def bestimmeDreiOptimaleBeantragungszeiträume():
-    # Tripel einlesen
-    T3 = load_T3('T3.bin.gz') 
-
     iprint(f"Drei Beantragungszeiträume, deren Summe maximal ist:")
-    print(f"{len(T3):,}".replace(',', '.') + " zu testende Kombinationen von drei Abrechnungszeiträumen.")
 
     # Initialisierung der maximalen Summe und des Tripel-Index
     max_sum = float('-inf')
     max_triplet = None
     triplet_sums = []
-
+    countT3 = 0
+    
     # Berechnung der Summen und Bestimmung der maximalen Summe
-    for triplet in T3:
+    for triplet in generatorT3():
         i, j, k = triplet
-        sum_value = Z[i] + Z[j] + Z[k]
+        countT3 += 1
+        sumT3 = Z[i] + Z[j] + Z[k]
 
-        if sum_value > max_sum or (sum_value == max_sum and triplet < max_triplet):
-            max_sum = sum_value
+        if sumT3 > max_sum or (sumT3 == max_sum and triplet < max_triplet):
+            max_sum = sumT3
             max_triplet = triplet
-            triplet_sums.append((sum_value, triplet))
+            triplet_sums.append((sumT3, triplet))
 
     # Sortieren der Tripel: Zuerst nach Summe (absteigend), dann nach Indizes (aufsteigend)
     triplet_sums.sort(key=lambda x: (-x[0], x[1]))  # -x[0] für absteigende Sortierung der Summe
 
     # Das erste Tripel ist das mit der größten Summe und den kleineren Indizes
+    print(f"{countT3:,}".replace(',', '.') + " zu testende Kombinationen von drei Abrechnungszeiträumen.")
     return triplet_sums[0]
    
 def iprint(outputline):
@@ -293,21 +220,12 @@ def iprint(outputline):
     print()
     print(ii()+outputline)
 
+
              
 def main():
 
     args = parse_arguments()
 
-    # teste, ob die Tupeldatei T2 und Tripeldatei T3 vorhanden sind
-
-    if not ( os.path.exists('T2.bin.gz') ):
-        print(f"Die für die Optimierung notwendigen Tupeldateien existieren nicht und werden nun erzeugt.")
-        generateTupel()
-
-    if not args.skip_3y and not ( os.path.exists('T3.bin.gz') ):
-        print(f"Die für die Optimierung notwendigen Tripeldateien existieren nicht und werden nun erzeugt. Die Erzeugung der Tripeldateien dauert mehrere Minuten.")
-        generateTripel()
-    
     global start_time
     start_time = time.time()
 
@@ -338,7 +256,7 @@ def main():
     iprint(f"Die eingelesenen Cigna-Daten umfassen den Zeitraum {T(startJD)} → {T(endJD)}, das sind {endJD-startJD+1} Tage.")
     print(f"Hinweis: Index[0] = Offset Julian date {startJD} ({t(0)})")
 
-    # Salaray values
+    # Salary values
     df_gehalt_sparse = load_gehalt_values(args.Durchschnittsgehälter)
     
     iprint("Die angenommenen Durchschnittsgehälter für die Bestimmung der Schwelle und der Eigenbeteiligung (20 %) mit ihren Änderungsdaten sind:")
@@ -409,7 +327,6 @@ def main():
             print(f"{T(jd)} {B(RAW[jd-offset])} {b(Z[jd-offset])} [{jd-offset}]")
 
     max_Sum1, opt_Mono = bestimmeEinenOptimalenBeantragungszeitraum()
-    
     max_Sum2, opt_Tupel = bestimmeZweiOptimaleBeantragungszeiträume()
     print(f"{tb(opt_Tupel[0])} + {tb(opt_Tupel[1])} => {b(max_Sum2)} Tupel{opt_Tupel}")
 
@@ -572,6 +489,7 @@ def main():
 
     # Zeige das Diagramm auch interaktiv an
     fig.show()
+
 
 if __name__ == "__main__":
     main()
