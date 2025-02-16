@@ -88,7 +88,7 @@ def parse_arguments():
         formatter_class=lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=45))
     parser.add_argument('Simulationsergebnisse', type=str, help="CSV-Datei der antragsberechtigten Beträge aus dem Simulator")
     parser.add_argument('Durchschnittsgehälter', type=str, help="CSV-Datei der durchschnittlichen Monatsgehälter")
-    parser.add_argument('--long', action='store_true', help="zeige die gesamte Ausgabeliste (eine Zeile pro Tag)")
+    parser.add_argument('--long', action='store_true', help="zeige die gesamte Ausgabeliste (eine Zeile für jeden Tag des Zeitraums)")
     parser.add_argument('--skip-3y', action='store_true', help="skip 3-Jahres-Optimierung (Option für schnelle Tests)")
     parser.parse_args(args=None if sys.argv[1:] else ['--help'])
     return parser.parse_args()
@@ -164,15 +164,13 @@ def generatorT3():
                 yield (i, j, k)  # Triplet erstellen
 
 def bestimmeEinenOptimalenBeantragungszeitraum():
-    iprint("Globales Maximum eines (einzigen) Beantragungszeitraums im gesamten Zeitfenster:")
+    # iprint("Globales Maximum eines (einzigen) Beantragungszeitraums im gesamten Zeitfenster:")
     jd = merged_df['Betrag'].idxmax()
-    print(f"{T(jd+offset)} {B(RAW[jd])} {b(Z[jd])} [{jd}]")
+    # print(f"{T(jd+offset)} {B(RAW[jd])} {b(Z[jd])} [{jd}]")
     return Z[jd], jd
 
 def bestimmeZweiOptimaleBeantragungszeiträume():
-    iprint(f"Zwei Beantragungszeiträume, deren Summe maximal ist:")
-
-    # Initialisierung der maximalen Summe und des Index-Tupels
+    # Initialisierung der maximalen Summe und maximalen Tupel-Index'
     max_sum = float('-inf')
     max_tupel = None
     tupel_sums = []
@@ -191,13 +189,11 @@ def bestimmeZweiOptimaleBeantragungszeiträume():
 
     # Sortieren der Tupel: Zuerst nach Summe (absteigend), dann nach Indizes (aufsteigend)
     tupel_sums.sort(key=lambda x: (-x[0], x[1]))  # -x[0] für absteigende Sortierung der Summe
-    print(f"{countT2:,}".replace(',', '.') + " zu testende Kombinationen von zwei Abrechnungszeiträumen.")
+    print(f"Hinweis: es wurden {countT2:,}".replace(',', '.') + " Kombinationen von zwei Abrechnungszeiträumen getestet.")
     return tupel_sums[0]
 
 def bestimmeDreiOptimaleBeantragungszeiträume():
-    iprint(f"Drei Beantragungszeiträume, deren Summe maximal ist:")
-
-    # Initialisierung der maximalen Summe und des Tripel-Index
+    # Initialisierung der maximalen Summe und des maximalen Tripel-Index'
     max_sum = float('-inf')
     max_triplet = None
     triplet_sums = []
@@ -218,7 +214,7 @@ def bestimmeDreiOptimaleBeantragungszeiträume():
     triplet_sums.sort(key=lambda x: (-x[0], x[1]))  # -x[0] für absteigende Sortierung der Summe
 
     # Das erste Tripel ist das mit der größten Summe und den kleineren Indizes
-    print(f"{countT3:,}".replace(',', '.') + " zu testende Kombinationen von drei Abrechnungszeiträumen.")
+    print(f"Hinweis: es wurden {countT3:,}".replace(',', '.') + " Kombinationen von drei Abrechnungszeiträumen getestet.")
     return triplet_sums[0]
    
 def iprint(outputline):
@@ -226,8 +222,39 @@ def iprint(outputline):
     print()
     print(ii()+outputline)
 
+def plot3(A, Amin, Amax, B, Bmin, Bmax, C, Cmin, Cmax):
+    
+    # Skaliere die Werte auf eine Breite von maxcolumn Zeichen
+    maxcolumn = 80
+    
+    def scale_value(value, min_val, max_val):
+        # Berechne die Position auf einer Skala von 0 bis maxcolumn
+        ret = int((value - min_val) / (max_val - min_val) * (maxcolumn - 1))  # -1 wegen Skalenstart bei 0
+        print(f"value {value} min_val {min_val} max_val {max_val} ret {ret}")
+        return ret
+        
+    # Skaliere A, B, C separat
+    pos_A = scale_value(A, Amin, Amax)
+    pos_B = scale_value(B, Bmin, Bmax)
+    pos_C = scale_value(C, Cmin, Cmax)
 
-             
+    # Erstelle eine Liste von Leerzeichen für die Skala
+    plot = [' '] * maxcolumn
+
+    # Erstelle eine Liste mit den skalierten Positionen und Symbolen
+    scaled_values = [(pos_A, '|'), (pos_B, '#'), (pos_C, '⊽')]
+    # Sortiere die Symbole gemäß ihrer Druckposition
+    scaled_values.sort()  # Sortiere nach der Position (kleinster Wert -> größte Position)
+    
+    # Setze die Symbole an die richtigen Positionen
+    for pos, plotsymbol in scaled_values:
+        print(pos)
+        plot[pos] = plotsymbol
+
+    # Gebe die Darstellung als eine einzelne Zeile zurück
+    return ''.join(plot)
+
+            
 def main():
 
     args = parse_arguments()
@@ -307,13 +334,15 @@ def main():
 
     # Modifikation der Betrag-Werte gemäß der Bedingung
     merged_df['cut'] = merged_df.apply(
-        lambda row: row['Betrag'] - 0.2 * row['gehalt'] if row['Betrag'] >= 0.2 * row['gehalt'] else 0.0, axis=1)
+        lambda row: row['Betrag'] - 0.2 * row['gehalt'] if row['Betrag'] >= 0.2 * row['gehalt'] else 0.0,
+        axis=1
+    )
 
     merged_df["antragsberechtigt"] = merged_df["Betrag"].apply(B)
     merged_df["Gehalt"] = merged_df["gehalt"].apply(B)
-    merged_df["gehalt20"] = merged_df["gehalt"].apply(lambda x: 0.2 * x)
+    merged_df["gehalt20"] = merged_df["gehalt"].apply(lambda gehalt: 0.2 * gehalt)
     merged_df["Cut"] = merged_df["cut"].apply(b)
-    merged_df["jd"] = merged_df["JD"].apply(lambda x: x - offset)
+    merged_df["jd"] = merged_df["JD"].apply(lambda JD: JD - offset)
    
     # Überschreibe Datensatz mit dem "cut"-Ergebnis
     global RAW
@@ -348,11 +377,16 @@ def main():
         LEAPYEAR=366
         MAXDAYS=YEAR-1+YEAR+YEAR+LEAPYEAR
 
+    iprint("Globales Maximum eines (einzigen) ältesten Beantragungszeitraums im gesamten Zeitfenster:")
     max_Sum1, opt_Mono = bestimmeEinenOptimalenBeantragungszeitraum()
+    print(f"{tb(opt_Mono)} => {ROT}{b(max_Sum1)}{NORM} [{opt_Mono}]")
+
+    iprint(f"Zwei älteste Beantragungszeiträume, deren Summe maximal ist:")
     max_Sum2, opt_Tupel = bestimmeZweiOptimaleBeantragungszeiträume()
     print(f"{tb(opt_Tupel[0])} + {tb(opt_Tupel[1])} => {ROT}{b(max_Sum2)}{NORM} Tupel{opt_Tupel}")
 
     if not args.skip_3y:
+        iprint(f"Drei älteste Beantragungszeiträume, deren Summe maximal ist:")
         max_Sum3, opt_Triplet = bestimmeDreiOptimaleBeantragungszeiträume()
         print(f"{tb(opt_Triplet[0])} + {tb(opt_Triplet[1])} + {tb(opt_Triplet[2])} => {ROT}{b(max_Sum3)}{NORM} Triplet[{opt_Triplet[0]}, {opt_Triplet[1]}, {opt_Triplet[2]}]")
     else:
@@ -360,55 +394,31 @@ def main():
         
     iprint(f"Total running time: {(time.time()-start_time):.2f} Sekunden.")
 
-    def f(A, Amin, Amax, B, Bmin, Bmax, C, Cmin, Cmax):
-    
-        # Skaliere die Werte auf eine Breite von 80 Zeichen
-        scale = 80
-    
-        def scale_value(value, min_val, max_val):
-            # Berechne die Position auf einer Skala von 0 bis 80
-            return int((value - min_val) / (max_val - min_val) * (scale - 1))  # -1 wegen Skalenstart bei 0
-
-        # Skaliere A, B, C separat
-        pos_A = scale_value(A, Amin, Amax)
-        pos_B = scale_value(B, Bmin, Bmax)
-        pos_C = scale_value(C, Cmin, Cmax)
-
-        # Erstelle eine Liste von Leerzeichen für die Skala
-        plot = [' '] * scale
-
-        # Erstelle eine Liste mit den skalierten Positionen und Symbolen
-        scaled_values = [(pos_A, '|'), (pos_B, '#'), (pos_C, '⊽')]
-        # Sortiere die Symbole nach Position
-        scaled_values.sort()  # Sortiere nach der Position (kleinster Wert -> größte Position)
-    
-        # Setze die Symbole an die richtigen Positionen
-        for pos, symbol in scaled_values:
-            plot[pos] = symbol
-
-        # Gebe die Darstellung als eine einzelne Zeile zurück
-        return ''.join(plot)
-
     Betrag_min, Betrag_max = min(merged_df['Betrag']), max(merged_df['Betrag'])
-  
-    # Berechne die neue Spalte 'Zusatz' und füge sie hinzu
-    merged_df['Zusatz'] = merged_df.apply(lambda row: f(row['Betrag'], Betrag_min, Betrag_max,
-        row['gehalt20'], Betrag_min, Betrag_max,
-        row['cut'], Betrag_min, Betrag_max),
-        axis=1)
+    
+    # Berechne die neue Spalte 'asciiplot' und füge sie hinzu
+    merged_df['asciiplot'] = merged_df.apply(lambda row:
+        plot3(
+            row['Betrag'], Betrag_min, Betrag_max,
+            row['gehalt20'], Betrag_min, Betrag_max,
+            row['cut'], Betrag_min, Betrag_max
+        ),
+        axis=1
+    )
 
+    exit()
     # Erstellen einer neuen Spalte, die den Wert des nächsten Index enthält
     merged_df['next_value'] = merged_df['Cut'].shift(-1)
 
     # Filtere, so dass nur Zeilen angezeigt werden, wenn sich der Wert geändert hat
     df_compact = merged_df[merged_df['Cut'] != merged_df['next_value']]
     iprint(f"Kontrollausgabe der Eingabedaten '{args.Simulationsergebnisse}' und '{args.Durchschnittsgehälter}'")
-    print(df_compact[['Datum', 'antragsberechtigt', 'Gehalt', 'Cut', 'Zusatz']].to_string(index=False))
+    print(df_compact[['Datum', 'antragsberechtigt', 'Gehalt', 'Cut', 'asciiplot']].to_string(index=False))
 
     if args.long:
         iprint(f"Kontrollausgabe der Eingabedaten '{args.Simulationsergebnisse}' und '{args.Durchschnittsgehälter}'")
-        # print(merged_df[['Datum', 'JD', 'jd', 'antragsberechtigt', 'Gehalt', 'Cut', 'Zusatz']].to_string(index=False))
-        print(merged_df[['Datum', 'antragsberechtigt', 'Gehalt', 'Cut', 'Zusatz']].to_string(index=False))
+        # print(merged_df[['Datum', 'JD', 'jd', 'antragsberechtigt', 'Gehalt', 'Cut', 'asciiplot']].to_string(index=False))
+        print(merged_df[['Datum', 'antragsberechtigt', 'Gehalt', 'Cut', 'asciiplot']].to_string(index=False))
     
     # Bestimme, ob das Jahr des Datums in einem Gregorianischen Schaltjahr liegt
     # df['Schaltjahr'] = df['Datum'].apply(lambda x: is_leap_year(x.year))
