@@ -1,7 +1,7 @@
 # A22 (Cigna-Anlage-H) Optimizer
 #
 # initial 20250122 TG
-#         20250214
+#         20250216
 #
 # erstellt mit teilweiser Verwendung von ChatGPT
 
@@ -40,6 +40,12 @@ def j2g(jd):
     # Umwandlung des Julianischen Tages in Jahr, Monat, Tag (Gregorianisches Datum)
     year, month, day = gregorian.from_jd(jd)
     return pd.to_datetime(f"{year}-{month:02d}-{day:02d}").date() # we do not use the time component
+
+# Funktion zur Umwandlung des Julianischen Tages in ein Gregorianisches Datum YYYYMMDD
+def j2YYYYMMDD(jd):
+    # Umwandlung des Julianischen Tages in Jahr, Monat, Tag (Gregorianisches Datum)
+    year, month, day = gregorian.from_jd(jd)
+    return pd.to_datetime(f"{year}{month:02d}{day:02d}").date() # we do not use the time component
 
 def T(jd):
    d=j2g(jd)
@@ -88,10 +94,17 @@ def parse_arguments():
         "CIGNA-Anlage-H-Optimizer\n \nSimulationsdaten und eigene Gehaltsdaten als CSV-Dateien einlesen, optimieren und graphisch darstellen.",
         formatter_class=lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=45))
     parser.add_argument('Simulationsergebnisse', type=str, help="CSV-Datei der antragsberechtigten Beträge aus dem Simulator")
-    parser.add_argument('Durchschnittsgehälter', type=str, help="CSV-Datei der durchschnittlichen Monatsgehälter")
-    parser.add_argument('--long', action='store_true', help="zeige die gesamte Ausgabeliste (eine Zeile für jeden Tag des Zeitraums)")
+
+    group1 = parser.add_mutually_exclusive_group()
+    group1.add_argument('Durchschnittsgehälter', nargs="?", type=str, help="CSV-Datei der durchschnittlichen Monatsgehälter (optional, bei Fehlen wird ein Standardwert angenommen)")
+    group1.add_argument('--averagesalary', type=float, default=5000.00 , help="optionaler Wert, der als durchschnittliches Gehalt angenommen wird (default: 5000,00)")
+
+    group2 = parser.add_mutually_exclusive_group()
+    group2.add_argument('--long', action='store_true', help="Liste von Tagesdaten bei Änderungen; mit ASCII-Plot")
+    group2.add_argument('--full', action='store_true', help="Liste von Tagesdaten bei Änderungen, Liste für jeden Tag; beide mit ASCII-Plots")
+
     parser.add_argument('--logformat', action='store_true', help="Ausgabeformat, das für eine Log-Datei optimiert ist")
-    parser.add_argument('--no3', action='store_true', help="ohne 3-Jahres-Optimierung (Option für schnelle Tests)")
+    parser.add_argument('--no3', action='store_true', help="ohne 3-Jahres-Optimierung (für schnelle Tests)")
     parser.parse_args(args=None if sys.argv[1:] else ['--help'])
     return parser.parse_args()
 
@@ -114,7 +127,6 @@ def load_Z_values(file_name='daten.csv'):
 
     # Entfernen des " €"-Zeichens aus der dritten Spalte (Index 2) und Umwandeln in Floats
     df['Betrag'] = df['Betrag'].str.replace(" €", "").str.replace(",",".").astype(float)
-
     return df
 
 # Benutzerdefinierte Funktion zum Bereinigen des Währungszeichens und Umwandeln in einen float-Wert
@@ -138,6 +150,17 @@ def load_gehalt_values(file_name='gehalt.csv'):
     # Das Datum als Julian Date speichern und die Beträge mit der Funktion 'parse_amount' umwandeln
     df['gehalt'] = df['gehalt'].apply(parse_amount)
     df['JD'] = df['Datum'].apply(date_to_julian)
+    df['formatted_gehalt']=df['gehalt'].apply(B)
+    return df
+
+# Einlesen der Gehalt-Werte aus der Datei gehalt.csv und optionale " €" entfernen
+def load_constant_gehalt_values(salary, startJD):
+
+    df = pd.DataFrame({'JD': [startJD], 'gehalt': [str(salary)]})
+  
+    # Das Datum als Julian Date speichern und die Beträge mit der Funktion 'parse_amount' umwandeln
+    df['gehalt'] = df['gehalt'].apply(parse_amount)
+    df['Datum'] = df['JD'].apply(j2YYYYMMDD)
     df['formatted_gehalt']=df['gehalt'].apply(B)
     return df
 
@@ -317,8 +340,14 @@ def main():
     iprint(f"Hinweis: Index[0] = Offset Julian date {startJD} ({t(0)})")
 
     # Salary values
-    df_gehalt_sparse = load_gehalt_values(args.Durchschnittsgehälter)
-    
+
+    if args.Durchschnittsgehälter and os.path.exists(args.Durchschnittsgehälter):
+        df_gehalt_sparse = load_gehalt_values(args.Durchschnittsgehälter)
+    else:
+        iprint("Keine Gehaltsdatei benannt bzw. Gehaltsdatei nicht gefunden.")
+        iprint(f"Als durchschnittliches Gehalt werden {B(args.averagesalary)} angenommen.")
+        df_gehalt_sparse = load_constant_gehalt_values(args.averagesalary, startJD)
+   
     iprint("Die angenommenen Durchschnittsgehälter für die Bestimmung der Schwelle und der Eigenbeteiligung (20 %) mit ihren Änderungsdaten sind:")
     print(df_gehalt_sparse[['Datum','formatted_gehalt']].to_string(index=False))
     
@@ -424,7 +453,7 @@ def main():
         iprint(f"Hinweis: Die Optimierung von drei Abrechnungszeiträumen wurde wunschgemäß übersprungen.")
         
     iprint(f"Total running time: {(time.time()-start_time):.2f} Sekunden.")
-
+    
     minScale = min( merged_df['Betrag'].min(), merged_df['gehalt20'].min(), merged_df['cut'].min() )
     maxScale = max( merged_df['Betrag'].max(), merged_df['gehalt20'].max(), merged_df['cut'].min() )
     
@@ -443,11 +472,13 @@ def main():
 
     # Filtere, so dass nur Zeilen angezeigt werden, wenn sich der Wert geändert hat
     df_compact = merged_df[merged_df['Cut'] != merged_df['next_value']]
-    iprint(f"Kontrollausgabe der Eingabedaten '{args.Simulationsergebnisse}' und '{args.Durchschnittsgehälter}'")
-    print(df_compact[['Datum', 'antragsberechtigt', 'Gehalt', 'Cut', 'asciiplot']].to_string(index=False))
 
-    if args.long:
-        iprint(f"Kontrollausgabe der Eingabedaten '{args.Simulationsergebnisse}' und '{args.Durchschnittsgehälter}'")
+    if args.long or args.full:
+        iprint(f"Kontrollausgabe der Eingabedaten '{args.Simulationsergebnisse}' und '{args.Durchschnittsgehälter}' (differenziell: liste Daten nur bei Änderung)")
+        print(df_compact[['Datum', 'antragsberechtigt', 'Gehalt', 'Cut', 'asciiplot']].to_string(index=False))
+
+    if args.full:
+        iprint(f"Kontrollausgabe der Eingabedaten '{args.Simulationsergebnisse}' und '{args.Durchschnittsgehälter}' (liste die Daten jeden Tages)")
         # print(merged_df[['Datum', 'JD', 'jd', 'antragsberechtigt', 'Gehalt', 'Cut', 'asciiplot']].to_string(index=False))
         print(merged_df[['Datum', 'antragsberechtigt', 'Gehalt', 'Cut', 'asciiplot']].to_string(index=False))
     
@@ -481,7 +512,6 @@ def main():
     else:
         title_of_plot = "Anlage H (vormals A22) Optimizer<br>1, 2 und 3 Abrechnungszeiträume"
     
-                  
     # Plotly Diagramm
     fig = px.line(long_df, 
               x='Datum', 
