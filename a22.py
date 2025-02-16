@@ -312,8 +312,6 @@ def main():
     global start_time
     start_time = time.time()
 
-    max_Sum3 = 0.0
-    
     # Automatische Erkennung des CSV-Separators
     separator = detect_separator(args.Simulationsergebnisse)
 
@@ -564,9 +562,11 @@ def main():
         "gehalt20": "20 % Gehalt",
         "cut_cyan": "Auszahlungsbetrag<br>unter Berücksichtigung<br>des Gehalts",
         "cut_white": "Keine Auszahlung,<br>da unterhalb des Eigenbeteiligungsmaximums",
-        "line1": "Ein optimaler Abrechnungszeitraum<br>(globales Maximum)<br>" + B(max_Sum1),
-        "line2": "Zwei optimale Abrechnungszeiträume<br>Σ2 " + B(max_Sum2),
-        "line3": "Drei optimale Abrechnungszeiträume<br>Σ3 " + B(max_Sum3) }
+        "line1": "Ein optimaler Abrechnungszeitraum<br>(globales Maximum)<br>" + B(max_Sum1) + "<br>" + tb(opt_Mono),
+        "line2": "Zwei optimale Abrechnungszeiträume<br>Σ2 " + B(max_Sum2) + "<br>" + tb(opt_Tupel[0]) + " " + tb(opt_Tupel[1]) }
+        
+    if not args.no3:
+        newnames['line3'] = "Drei optimale Abrechnungszeiträume<br>Σ3 " + B(max_Sum3) + "<br>" + tb(opt_Triplet[0]) + " " + tb(opt_Triplet[1]) + " " + tb(opt_Triplet[2])
 
     fig.for_each_trace(lambda t: t.update(name = newnames[t.name],
         legendgroup = newnames[t.name],
