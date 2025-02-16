@@ -511,7 +511,7 @@ def main():
         title_of_plot = "Anlage H (vormals A22) Optimizer<br>1, 2 und 3 Abrechnungszeiträume"
     
     # Plotly Diagramm
-    fig = px.line(long_df, 
+    fig = px.line(long_df,
               x='Datum', 
               y='Wert', 
               color='Kategorie',
@@ -521,7 +521,7 @@ def main():
               labels={'Datum': 'Startdatum', 'Wert': '(€)', 'Kategorie': 'Kurven'},
               template='plotly')
 
-    def plotLine( jd, offset, linename, text, color ):
+    def plotLine( jd, offset, linename, text, color, width ):
         datum_range = []
         for i in range(jd+offset, jd+offset+leapspan(jd) ):
             datum_range.append(j2g(i))
@@ -532,30 +532,28 @@ def main():
             y = [betrag]* len(datum_range),
             mode = 'lines',  
             name = linename,
-            line = dict(color=color, width=1 ),
+            line = dict(color = color, width = width ),
             hoverinfo = "x+y",
             hovertemplate = text+"<br>Datum: %{x}<br>Wert: %{y}€"  
         ))
 
-
-    plotLine( opt_Mono, offset, "line1", "Zeitraum", "black")
+    plotLine( opt_Mono, offset, "line1", "Zeitraum", "black", 7)
 
     try:
         if opt_Tupel:
-            plotLine( opt_Tupel[0], offset, "line2", "1. Zeitraum", "lightblue")
-            plotLine( opt_Tupel[1], offset, "line2", "2. Zeitraum", "lightblue")
+            plotLine( opt_Tupel[0], offset, "line2", "1. Zeitraum", "lime", 5)
+            plotLine( opt_Tupel[1], offset, "line2", "2. Zeitraum", "lime", 5)
     except:
         pass
-        
+
     try:
         if opt_Triplet:
-            plotLine( opt_Triplet[0], offset, "line3", "1. Zeitraum", "blue")
-            plotLine( opt_Triplet[1], offset, "line3", "2. Zeitraum", "blue")
-            plotLine( opt_Triplet[2], offset, "line3", "3. Zeitraum", "blue")
+            plotLine( opt_Triplet[0], offset, "line3", "1. Zeitraum", "blue", 3)
+            plotLine( opt_Triplet[1], offset, "line3", "2. Zeitraum", "blue", 3)
+            plotLine( opt_Triplet[2], offset, "line3", "3. Zeitraum", "blue", 3)
     except:
         pass
-        
-
+                
     # Texte anpassen
     newnames = { "Betrag_yellow": "antragsberechtigt (< 20 % Gehalt)",
         "Betrag_red": "antragsberechtigt (≥ 20 % Gehalt)",
