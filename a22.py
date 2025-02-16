@@ -136,8 +136,24 @@ def load_gehalt_values(file_name='gehalt.csv'):
     # Das Datum als Julian Date speichern und die Beträge mit der Funktion 'parse_amount' umwandeln
     df['gehalt'] = df['gehalt'].apply(parse_amount)
     df['JD'] = df['Datum'].apply(date_to_julian)
-    df['formatted_gehalt']=df['gehalt'].apply(b)
+    df['formatted_gehalt']=df['gehalt'].apply(B)
     return df
+
+class Progressbar:
+    def __init__(self, endprogress):
+        self.lastprogress = 0
+        self.endprogress = endprogress
+        self.delta = int(endprogress/20)
+        
+    def __call__(self, progress):
+        if ( progress >= self.lastprogress + self.delta ):
+            self.lastprogress = progress
+            ratio = round( 100.0 * progress/self.endprogress )
+            for i in range(int( ratio / 2)):
+                sys.stdout.write(f"\rFortschritt: [{(i+1) * '#':<50}] {ratio} %")
+                sys.stdout.flush()
+            if ratio > 99:
+                print() # end the progressbar line
 
 # adjust for 365/366 search windows
 # wenn der aktuelle Beantragungszeitraum einen Schalttag umfasst,
@@ -164,9 +180,7 @@ def generatorT3():
                 yield (i, j, k)  # Triplet erstellen
 
 def bestimmeEinenOptimalenBeantragungszeitraum():
-    # iprint("Globales Maximum eines (einzigen) Beantragungszeitraums im gesamten Zeitfenster:")
     jd = merged_df['Betrag'].idxmax()
-    # print(f"{T(jd+offset)} {B(RAW[jd])} {b(Z[jd])} [{jd}]")
     return Z[jd], jd
 
 def bestimmeZweiOptimaleBeantragungszeiträume():
@@ -175,9 +189,11 @@ def bestimmeZweiOptimaleBeantragungszeiträume():
     max_tupel = None
     tupel_sums = []
     countT2 = 0
+    progressT2 = Progressbar(599753)
     
     # Berechnung der Summen und Bestimmung der maximalen Summe
     for tupel in generatorT2():
+        progressT2(countT2)
         i, j = tupel
         countT2 += 1
         sumT2 = Z[i] + Z[j]
@@ -186,11 +202,10 @@ def bestimmeZweiOptimaleBeantragungszeiträume():
             max_sum = sumT2
             max_tupel = tupel
             tupel_sums.append((sumT2, tupel))
-
+    
     # Sortieren der Tupel: Zuerst nach Summe (absteigend), dann nach Indizes (aufsteigend)
     tupel_sums.sort(key=lambda x: (-x[0], x[1]))  # -x[0] für absteigende Sortierung der Summe
-    print(f"Hinweis: es wurden {countT2:,}".replace(',', '.') + " Kombinationen von zwei Abrechnungszeiträumen getestet.")
-    return tupel_sums[0]
+    return countT2, tupel_sums[0]
 
 def bestimmeDreiOptimaleBeantragungszeiträume():
     # Initialisierung der maximalen Summe und des maximalen Tripel-Index'
@@ -198,9 +213,11 @@ def bestimmeDreiOptimaleBeantragungszeiträume():
     max_triplet = None
     triplet_sums = []
     countT3 = 0
-    
+    progressT3 = Progressbar(64925721)
+            
     # Berechnung der Summen und Bestimmung der maximalen Summe
     for triplet in generatorT3():
+        progressT3(countT3)
         i, j, k = triplet
         countT3 += 1
         sumT3 = Z[i] + Z[j] + Z[k]
@@ -209,13 +226,12 @@ def bestimmeDreiOptimaleBeantragungszeiträume():
             max_sum = sumT3
             max_triplet = triplet
             triplet_sums.append((sumT3, triplet))
-
+    
     # Sortieren der Tripel: Zuerst nach Summe (absteigend), dann nach Indizes (aufsteigend)
     triplet_sums.sort(key=lambda x: (-x[0], x[1]))  # -x[0] für absteigende Sortierung der Summe
 
     # Das erste Tripel ist das mit der größten Summe und den kleineren Indizes
-    print(f"Hinweis: es wurden {countT3:,}".replace(',', '.') + " Kombinationen von drei Abrechnungszeiträumen getestet.")
-    return triplet_sums[0]
+    return countT3, triplet_sums[0]
    
 def iprint(outputline):
     ii = Counter()
@@ -229,9 +245,7 @@ def plot3(A, Amin, Amax, B, Bmin, Bmax, C, Cmin, Cmax):
     
     def scale_value(value, min_val, max_val):
         # Berechne die Position auf einer Skala von 0 bis maxcolumn
-        ret = int((value - min_val) / (max_val - min_val) * (maxcolumn - 1))  # -1 wegen Skalenstart bei 0
-        print(f"value {value} min_val {min_val} max_val {max_val} ret {ret}")
-        return ret
+        return int((value - min_val) / (max_val - min_val) * (maxcolumn - 1))  # -1 wegen Skalenstart bei 0
         
     # Skaliere A, B, C separat
     pos_A = scale_value(A, Amin, Amax)
@@ -243,12 +257,12 @@ def plot3(A, Amin, Amax, B, Bmin, Bmax, C, Cmin, Cmax):
 
     # Erstelle eine Liste mit den skalierten Positionen und Symbolen
     scaled_values = [(pos_A, '|'), (pos_B, '#'), (pos_C, '⊽')]
+
     # Sortiere die Symbole gemäß ihrer Druckposition
     scaled_values.sort()  # Sortiere nach der Position (kleinster Wert -> größte Position)
     
     # Setze die Symbole an die richtigen Positionen
     for pos, plotsymbol in scaled_values:
-        print(pos)
         plot[pos] = plotsymbol
 
     # Gebe die Darstellung als eine einzelne Zeile zurück
@@ -382,31 +396,35 @@ def main():
     print(f"{tb(opt_Mono)} => {ROT}{b(max_Sum1)}{NORM} [{opt_Mono}]")
 
     iprint(f"Zwei älteste Beantragungszeiträume, deren Summe maximal ist:")
-    max_Sum2, opt_Tupel = bestimmeZweiOptimaleBeantragungszeiträume()
+    countT2, (max_Sum2, opt_Tupel) = bestimmeZweiOptimaleBeantragungszeiträume()
     print(f"{tb(opt_Tupel[0])} + {tb(opt_Tupel[1])} => {ROT}{b(max_Sum2)}{NORM} Tupel{opt_Tupel}")
+    iprint(f"Hinweis: es wurden {countT2:,}".replace(',', '.') + " Kombinationen von zwei Abrechnungszeiträumen getestet.")
 
     if not args.skip_3y:
         iprint(f"Drei älteste Beantragungszeiträume, deren Summe maximal ist:")
-        max_Sum3, opt_Triplet = bestimmeDreiOptimaleBeantragungszeiträume()
-        print(f"{tb(opt_Triplet[0])} + {tb(opt_Triplet[1])} + {tb(opt_Triplet[2])} => {ROT}{b(max_Sum3)}{NORM} Triplet[{opt_Triplet[0]}, {opt_Triplet[1]}, {opt_Triplet[2]}]")
+        countT3, (max_Sum3, opt_Triplet) = bestimmeDreiOptimaleBeantragungszeiträume()
+        print(f"{tb(opt_Triplet[0])} + {tb(opt_Triplet[1])} + {tb(opt_Triplet[2])} " +
+            f"=> {ROT}{b(max_Sum3)}{NORM} Triplet[{opt_Triplet[0]}, {opt_Triplet[1]}, {opt_Triplet[2]}]")
+        iprint(f"Hinweis: es wurden {countT3:,}".replace(',', '.') + " Kombinationen von drei Abrechnungszeiträumen getestet.")
+
     else:
         iprint(f"Hinweis: Die Optimierung von drei Abrechnungszeiträumen wurde wunschgemäß übersprungen.")
         
     iprint(f"Total running time: {(time.time()-start_time):.2f} Sekunden.")
 
-    Betrag_min, Betrag_max = min(merged_df['Betrag']), max(merged_df['Betrag'])
+    minScale = min( merged_df['Betrag'].min(), merged_df['gehalt20'].min(), merged_df['cut'].min() )
+    maxScale = max( merged_df['Betrag'].max(), merged_df['gehalt20'].max(), merged_df['cut'].min() )
     
     # Berechne die neue Spalte 'asciiplot' und füge sie hinzu
     merged_df['asciiplot'] = merged_df.apply(lambda row:
         plot3(
-            row['Betrag'], Betrag_min, Betrag_max,
-            row['gehalt20'], Betrag_min, Betrag_max,
-            row['cut'], Betrag_min, Betrag_max
+            row['Betrag'], minScale, maxScale,
+            row['gehalt20'], minScale, maxScale,
+            row['cut'], minScale, maxScale
         ),
         axis=1
     )
 
-    exit()
     # Erstellen einer neuen Spalte, die den Wert des nächsten Index enthält
     merged_df['next_value'] = merged_df['Cut'].shift(-1)
 
