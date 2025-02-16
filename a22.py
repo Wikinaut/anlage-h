@@ -25,6 +25,7 @@ import os
 
 ROT="\033[31m"
 NORM="\033[0m"
+
 """
 \033[32m  Grün  
 \033[33m  Gelb  
@@ -89,7 +90,8 @@ def parse_arguments():
     parser.add_argument('Simulationsergebnisse', type=str, help="CSV-Datei der antragsberechtigten Beträge aus dem Simulator")
     parser.add_argument('Durchschnittsgehälter', type=str, help="CSV-Datei der durchschnittlichen Monatsgehälter")
     parser.add_argument('--long', action='store_true', help="zeige die gesamte Ausgabeliste (eine Zeile für jeden Tag des Zeitraums)")
-    parser.add_argument('--skip-3y', action='store_true', help="skip 3-Jahres-Optimierung (Option für schnelle Tests)")
+    parser.add_argument('--logformat', action='store_true', help="Ausgabeformat, das für eine Log-Datei optimiert ist")
+    parser.add_argument('--no3', action='store_true', help="ohne 3-Jahres-Optimierung (Option für schnelle Tests)")
     parser.parse_args(args=None if sys.argv[1:] else ['--help'])
     return parser.parse_args()
 
@@ -146,6 +148,8 @@ class Progressbar:
         self.delta = int(endprogress/20)
         
     def __call__(self, progress):
+        if args.logformat:
+            return
         if ( progress >= self.lastprogress + self.delta ):
             self.lastprogress = progress
             ratio = round( 100.0 * progress/self.endprogress )
@@ -271,8 +275,17 @@ def plot3(A, Amin, Amax, B, Bmin, Bmax, C, Cmin, Cmax):
             
 def main():
 
+    global args
     args = parse_arguments()
 
+    global ROT
+    global NORM
+    
+    if args.logformat:
+        # lösche die Escapesequencen, damit sie nicht im Logfile auftauchen
+        ROT=""
+        NORM=""
+    
     global start_time
     start_time = time.time()
 
@@ -400,7 +413,7 @@ def main():
     print(f"{tb(opt_Tupel[0])} + {tb(opt_Tupel[1])} => {ROT}{b(max_Sum2)}{NORM} Tupel{opt_Tupel}")
     iprint(f"Hinweis: es wurden {countT2:,}".replace(',', '.') + " Kombinationen von zwei Abrechnungszeiträumen getestet.")
 
-    if not args.skip_3y:
+    if not args.no3:
         iprint(f"Drei älteste Beantragungszeiträume, deren Summe maximal ist:")
         countT3, (max_Sum3, opt_Triplet) = bestimmeDreiOptimaleBeantragungszeiträume()
         print(f"{tb(opt_Triplet[0])} + {tb(opt_Triplet[1])} + {tb(opt_Triplet[2])} " +
@@ -463,7 +476,7 @@ def main():
         "cut_white": "grey"
     }
     
-    if args.skip_3y:
+    if args.no3:
         title_of_plot = "Anlage H (vormals A22) Optimizer<br>1 und 2 Abrechnungszeiträume"
     else:
         title_of_plot = "Anlage H (vormals A22) Optimizer<br>1, 2 und 3 Abrechnungszeiträume"
