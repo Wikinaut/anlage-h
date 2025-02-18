@@ -207,7 +207,7 @@ def generatorT3():
                 yield (i, j, k)  # Triplet erstellen
 
 def bestimmeEinenOptimalenBeantragungszeitraum():
-    jd = merged_df['Betrag'].idxmax()
+    jd = merged_df['cut'].idxmax()
     return Z[jd], jd
 
 def bestimmeZweiOptimaleBeantragungszeiträume():
