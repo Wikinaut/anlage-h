@@ -9,14 +9,14 @@
 <body>
 
 <h1>Anlage-H-Optimizer (Testdaten)</h1>
-<button id="Start">Klick mich</button>
-<div id="log"></div>
+<div id="output"></div>
 
 <script>
 
 // initial 20250218
 //
-$(document).ready(function() {
+
+async function main() {
 
 MAXDAYS=1460
 LEAPDAY=1153
@@ -57,11 +57,25 @@ function* generatorT3() {
     }
 }
 
-offset = 2459217;
+async function print(string) {
+    $('#output').append(string+"<br>")
+    return new Promise(resolve => requestAnimationFrame(resolve));
+}
 
-Z = testdata()
+async function printElement(el, string) {
+    $(el).html(string)
+    return new Promise(resolve => requestAnimationFrame(resolve));
+}
 
-// bestimmeZweiOptimaleBeantragungszeiträume():
+
+async function rendernow() {
+    // Warten, bis der Browser das nächste Frame rendert
+    return new Promise(resolve => requestAnimationFrame(resolve));
+}
+    
+async function bestimmeZweiOptimaleBeantragungszeiträume() {
+
+    await print('Berechnung von zwei optimalen Intervallen startet.')
 
     // Initialisierung der maximalen Summe und maximalen Tupel-Index'
     max_sumT2 = -1
@@ -79,12 +93,13 @@ Z = testdata()
         }
     }
 
-$('#log').append( "<br>Zwei Intervalle: ["+max_tupel[0]+","+max_tupel[1]+"] => "+max_sumT2+" €" )
+    print( "Zwei Intervalle: ["+max_tupel[0]+","+max_tupel[1]+"] => "+max_sumT2+" €" )
+}
 
 
-// bestimmeDreiOptimaleBeantragungszeiträume():
+async function bestimmeDreiOptimaleBeantragungszeiträume() {
 
-countT3 = 0
+    await print('<br>Berechnung von drei optimalen Intervallen startet.<br><div id="maxsum"></div>')
 
     max_sumT3 = -1
     max_triplet = []
@@ -97,11 +112,34 @@ countT3 = 0
 
         if (sumT3 > max_sumT3) {
             max_sumT3 = sumT3
+            // await print(max_sumT3)
+            await printElement( "#maxsum", max_sumT3.toFixed(2) )
             max_triplet = [t31, t32, t33]
         }    
     }
 
-$('#log').append( "<br>Drei Intervalle: ["+max_triplet[0]+","+max_triplet[1]+","+max_triplet[2]+"] => "+max_sumT3+" €" )
+    print( "Drei Intervalle: ["+max_triplet[0]+","+max_triplet[1]+","+max_triplet[2]+"] => "+max_sumT3+" €" )
+}
+
+    /*** main ***/
+    
+    await print( "Lade Testdaten.")
+    
+    Z = testdata()
+    await rendernow()
+    
+    var offset = 2459217;
+    
+    bestimmeZweiOptimaleBeantragungszeiträume()
+    await rendernow();
+    
+    bestimmeDreiOptimaleBeantragungszeiträume()
+    await rendernow();
+    
+} /* main */
+
+main();
+
 
 function testdata() {
 
@@ -255,7 +293,6 @@ return [502.63,502.63,502.63,502.63,512.98,512.98,512.98,512.98,512.98,512.98,
 276.81,276.81,276.81,276.81,276.81,150.81,150.81,17.31,17.31,17.31,
 17.31,17.31,17.31,17.31,17.31,17.31,17.31,17.31,17.31,17.31]; }
 
-});
 </script>
 
 </body>
