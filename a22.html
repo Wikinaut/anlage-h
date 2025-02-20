@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jQuery lokal ausführen</title>
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="http://www.opteryx.de/js/flot/jquery.flot.js"></script>
+    <script src="http://www.opteryx.de/js/flot/jquery.flot.time.js"></script>
+    <script src="http://www.opteryx.de/js/jquery.cookie.js"></script>
 </head>
 <body>
 
 <h1>Anlage-H-Optimizer (Testdaten)</h1>
 <div id="output"></div>
+<div id="plot" style="width:100%;height:300px"></div>
 
 <script>
 
@@ -112,7 +116,6 @@ async function bestimmeDreiOptimaleBeantragungszeiträume() {
 
         if (sumT3 > max_sumT3) {
             max_sumT3 = sumT3
-            // await print(max_sumT3)
             await printElement( "#maxsum", max_sumT3.toFixed(2) )
             max_triplet = [t31, t32, t33]
         }    
@@ -134,13 +137,56 @@ async function bestimmeDreiOptimaleBeantragungszeiträume() {
     bestimmeZweiOptimaleBeantragungszeiträume()
     await rendernow();
     
-    bestimmeDreiOptimaleBeantragungszeiträume()
+    // bestimmeDreiOptimaleBeantragungszeiträume()
+    plotChart( "#plot" )
     
 } /* main */
 
 main();
 
+function plotChart( element ) {
 
+		/* show a plot (diagramm) */
+				
+		// http://www.flotcharts.org/flot/examples/axes-time/index.html
+		// https://github.com/flot/flot/blob/master/API.md#time-series-data
+		// http://www.flotcharts.org/flot/examples/interacting/index.html
+
+		var p1 = new Array();
+
+		for (jd in Z) {
+			p1.push( [ jd, Z[jd] ] )
+		}
+
+		var p1_color = "magenta";
+
+		dataSeries = [
+			{ data: p1, color: p1_color, label: "Nicht erstattete Auslagen", yaxis: 1 },
+		];
+
+		var plot = $.plot( $(element),
+			dataSeries,
+			{
+				xaxes: [
+					{
+						mode: null
+					}
+				],
+				yaxes: [
+					{
+					color: p1_color
+					},
+				], // https://www.flotcharts.org/flot/API/#plot-options
+				lines: { lineWidth: 1, shadowSize: 5 },
+			}
+		);
+
+	 // var myCanvas = plot.getCanvas();
+	 // Canvas2Image.saveAsPNG(myCanvas, 1200, 800, 'a22plot', true);
+		
+}; // plotChart
+
+	
 function testdata() {
 
 /* Dummydaten */
