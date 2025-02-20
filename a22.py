@@ -573,7 +573,7 @@ def main():
                                       
     # Zeige das Diagramm an
     fig.update_layout(
-        xaxis_title="Startdatum des 365/366-Tage-Intervals",
+        xaxis_title="Startdatum des 365/366-Tage-Intervalls",
         yaxis_title="antragsberechtigt, 20 % Gehalt, Auszahlungsbetrag (€)",
         xaxis_tickformat="%Y-%m-%d"  # Formatierung des Datums auf der x-Achse
     )
